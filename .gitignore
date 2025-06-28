@@ -1,0 +1,22 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build
+bin/
+obj/
+
+# Rider
+.idea/
+
+# Dotnet
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Others
+*.vsidx
