@@ -25,6 +25,8 @@ namespace ClientService.EF
         public DbSet<ProductPoint> ProductPoints { get; set; }
         public DbSet<AdditionalUserInfo> AdditionalUserInfo { get; set; }
 
+        public DbSet<ProductArticuls> ProductArticuls { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<ProductPoint>()

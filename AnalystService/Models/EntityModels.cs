@@ -51,10 +51,13 @@ namespace ClientService.Models
         public Guid UserId { get; set; }
         public string MerchantProductCode { get; set; }
         public string ProductName { get; set; }
+        public double fitstMarketPrice { get; set; }
+        public double lastMarketPrice { get; set; }
         public double ActualPrice { get; set; }
         public string ImageUrl { get; set; }
         public string MarketUrl { get; set; }
         public int Remains { get; set; }
+        public int Place { get; set; }
         public bool IsDump { get; set; }
         public double MaxPrice { get; set; }
         public double MinPrice { get; set; }
@@ -83,6 +86,16 @@ namespace ClientService.Models
         public string HalykToken { get; set; }
         public string TelegramId { get; set; }
         public DateTime TimeFlag { get; set; }
+
+    }
+
+    public class ProductArticuls
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid Id { get; set; }
+        public string productName { get; set; }
+        public string Articule { get; set; }
 
     }
 }

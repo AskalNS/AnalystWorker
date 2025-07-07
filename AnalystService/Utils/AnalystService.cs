@@ -10,6 +10,7 @@ using System.Text;
 using System;
 using ClientService.EF;
 using ClientService.Models;
+using System.Text.Json;
 
 namespace Analyst.Utils
 {
@@ -26,33 +27,43 @@ namespace Analyst.Utils
             _logger = logger;
         }
 
-        public async Task<int?> ParseMinPriceAsync(string productQuery)
+        public async Task<List<int>> ParseMinPriceAsync(string skuId)
         {
-            string query = AnalystUtils.SimplifyQuery(productQuery);
-            string url = $"https://halykmarket.kz/search?r46_search_query={HttpUtility.UrlEncode(query)}";
+            string url = $"https://halykmarket.kz/api/public/v1/product/allMerchantOffersV2?skuId={skuId}&page=1&size=20&paymentType=LOAN&legacySort=false&sortBy=DEFAULT&merchantName=&deliveryPeriod=&officialDistributorOnly=false";
 
-            var response = await _httpClient.GetAsync(url);
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Accept", "application/json, text/plain, */*");
+            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            request.Headers.Add("Referer", $"https://halykmarket.kz/product/{skuId}");
+            request.Headers.Add("Accept-Language", "ru");
+            request.Headers.Add("CityCode", "750000000");
+
+            var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
                 return null;
 
-            var html = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync();
 
-            var doc = new HtmlDocument();
-            doc.LoadHtml(html);
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
 
-            var priceNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'h-product-card__price')]");
-            if (priceNodes == null) return null;
+                if (!root.TryGetProperty("merchantInfoList", out var merchants))
+                    return null;
 
-            var prices = priceNodes
-                .Select(node => node.InnerText.Replace("₸", "").Replace(" ", "").Trim())
-                .Select(text => int.TryParse(text, out var price) ? price : (int?)null)
-                .Where(p => p.HasValue)
-                .Select(p => p.Value)
-                .ToList();
+                var prices = merchants.EnumerateArray()
+                    .Select(m => m.GetProperty("price").GetDecimal())
+                    .Select(p => (int)p)
+                    .ToList();
 
-            return prices.Any() ? prices.Min() : (int?)null;
+                return prices;
+            }
+            catch
+            {
+                return null;
+            }
         }
-
 
 
         public async Task<string?> LoginAsync(string login, string password)
@@ -99,7 +110,7 @@ namespace Analyst.Utils
         }
 
 
-        public async Task SendNotificationAsync(Guid userId, string productName, double oldPrice, int newPrice, string productUrl)
+        public async Task SendNotificationAsync(Guid userId, string productName, double oldPrice, double newPrice, string productUrl)
         {
             try
             {
@@ -115,7 +126,35 @@ namespace Analyst.Utils
                 long chatId = Convert.ToInt64(chatStringId);
 
 
-                var message = $"Цена на *{productName}*: {oldPrice} ₸ → {newPrice} ₸\n[Ссылка]({productUrl})";
+                var message = $"Цена на *{productName}*: {oldPrice} ₸ → {newPrice} ₸\n[Ссылка]( https://halykmarket.kz{productUrl})";
+
+                var payload = new
+                {
+                    chat_id = chatId,
+                    text = message,
+                    parse_mode = "Markdown",
+                    disable_web_page_preview = true
+                };
+
+                var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync($"https://api.telegram.org/bot{_telegramBotToken}/sendMessage", content);
+
+                response.EnsureSuccessStatusCode();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Ошибка отправки Telegram уведомления: {ex.Message}");
+            }
+        }
+
+        public async Task SendNotificationAdminAsync(string message)
+        {
+            try
+            {
+                string _telegramBotToken = "7980379241:AAFnd_6NuI3PAlUPomo-4T42vyfZe_i7vuI";
+
+                long chatId = 8053567705;
 
                 var payload = new
                 {
